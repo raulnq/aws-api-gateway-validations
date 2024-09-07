@@ -1,0 +1,69 @@
+openapi: "3.0.1"
+info:
+  title: "apival"
+  version: "1.0"
+paths:
+  /pets:
+    post:
+      parameters:
+      - name: "traceid"
+        in: "header"
+        required: true
+        schema:
+          type: "string"
+      - name: "version"
+        in: "query"
+        required: true
+        schema:
+          type: "string"
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/registerpetrequest"
+        required: true
+      x-amazon-apigateway-request-validator: "body-and-params"
+      x-amazon-apigateway-integration:
+        type: "aws_proxy"
+        httpMethod: "POST"
+        uri: 
+          Fn::Sub: "arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${MyApiFunction.Arn}/invocations"
+        passthroughBehavior: "when_no_match"
+      responses:
+        200:
+          description: successful operation
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/registerpetresponse' 
+components:
+  schemas:
+    registerpetrequest:
+      required:
+      - "name"
+      type: "object"
+      properties:
+        name:
+          type: "string"
+          minLength: 1
+    registerpetresponse:
+      type: object
+      properties:
+        petId:
+          type: "string"
+        name:
+          type: "string"
+      required:
+        - petId
+        - name
+x-amazon-apigateway-gateway-responses:
+  BAD_REQUEST_BODY:
+    responseParameters:
+      gatewayresponse.header.traceid: "method.request.header.traceid"
+    responseTemplates:
+      application/json: "{\"type\":\"https://example.net/validation-error\" ,\"detail\"\
+        : \"$context.error.messageString\", \"title\":\"Validation error\" }"
+x-amazon-apigateway-request-validators:
+  body-and-params:
+    validateRequestParameters: true
+    validateRequestBody: true

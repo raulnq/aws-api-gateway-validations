@@ -1,0 +1,65 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Transform: AWS::Serverless-2016-10-31
+Description: >
+  SAM
+
+Resources:
+  MyApi:
+    Type: AWS::Serverless::Api
+    Properties:
+#      OpenApiVersion: '3.0.1'
+#      DefinitionBody:
+#        'Fn::Transform':
+#          Name: 'AWS::Include'
+#          Parameters:
+#            Location: openapi.yml
+      StageName: prod
+      GatewayResponses:
+        BAD_REQUEST_BODY:
+          ResponseParameters:
+            Headers:
+              traceid: "method.request.header.traceid"
+          ResponseTemplates:
+            application/json: "{\"type\":\"https://example.net/validation-error\" ,\"detail\": \"$context.error.messageString\", \"title\":\"Validation error\" }"
+      Models:
+        RegisterPetRequest:
+          type: "object"
+          properties:
+            name:
+              type: "string"
+              minLength: 1
+          required:
+            - name
+
+  MyApiFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      Timeout: 60
+      MemorySize: 512
+      Tracing: Active
+      Runtime: dotnet8
+      Architectures:
+        - x86_64    
+      Handler: MyLambda::MyLambda.Function::FunctionHandler
+      CodeUri: ./src/MyLambda/
+      Events:
+        Post:
+          Type: Api
+          Properties:
+            RestApiId: !Ref MyApi
+            Path: /pets
+            Method: post
+            RequestParameters:
+             - method.request.header.traceid:
+                 Required: true
+             - method.request.querystring.version:
+                 Required: true
+            RequestModel:
+              Model: RegisterPetRequest
+              ValidateBody: true
+              ValidateParameters: true
+
+Outputs:
+  MyApiEndpoint:
+    Description: "API endpoint"
+    Value: !Sub "https://${MyApi}.execute-api.${AWS::Region}.amazonaws.com/prod/pets"
